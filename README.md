@@ -1,70 +1,185 @@
-# Getting Started with Create React App
+# AI Document Q&A System — RAG Pipeline with Amazon Bedrock
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A full-stack AI application that lets you upload any PDF and have a multi-turn conversation with it. Built on a production-grade RAG (Retrieval-Augmented Generation) pipeline using Amazon Bedrock, LangChain, and ChromaDB.
 
-## Available Scripts
+![Python](https://img.shields.io/badge/Python-3.13-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green)
+![LangChain](https://img.shields.io/badge/LangChain-latest-orange)
+![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock-yellow)
+![React](https://img.shields.io/badge/React-18-61DAFB)
 
-In the project directory, you can run:
+---
 
-### `npm start`
+## How It Works
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```
+PDF Upload → Text Extraction → Chunking → Embedding → ChromaDB
+                                                            ↓
+User Question → Query Embedding → Similarity Search → Top-K Chunks
+                                                            ↓
+                                            Claude Sonnet 4.5 → Answer + Page Citations
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+1. **Ingestion** — PDF is extracted page by page using PyMuPDF, split into 512-token chunks with 50-token overlap, embedded using Amazon Titan Embeddings V2, and stored in ChromaDB
+2. **Retrieval** — User query is embedded with the same model, and the top-5 most semantically similar chunks are retrieved via cosine similarity search
+3. **Synthesis** — Retrieved chunks are injected into a prompt sent to Claude Sonnet 4.5 on Amazon Bedrock, which generates a grounded answer with inline page citations
+4. **Memory** — Conversation history is maintained across turns, enabling natural follow-up questions
 
-### `npm test`
+---
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Tech Stack
 
-### `npm run build`
+| Layer          | Technology                           |
+| -------------- | ------------------------------------ |
+| LLM            | Amazon Bedrock — Claude Sonnet 4.5   |
+| Embeddings     | Amazon Bedrock — Titan Embeddings V2 |
+| Vector Store   | ChromaDB (persisted to disk)         |
+| RAG Framework  | LangChain, LangChain-AWS             |
+| Backend        | FastAPI, Uvicorn                     |
+| PDF Processing | PyMuPDF (fitz)                       |
+| Frontend       | React, Axios                         |
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+---
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Project Structure
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```
+rag-doc-qa/
+├── backend/
+│   ├── main.py          # FastAPI app — /upload and /chat endpoints
+│   ├── ingest.py        # PDF extraction, chunking, embedding, vector storage
+│   ├── query.py         # Semantic retrieval and LLM synthesis
+│   ├── requirements.txt
+│   └── chroma_store/    # Persisted vector database (auto-created)
+└── frontend/
+    └── src/
+        ├── App.jsx
+        ├── Upload.jsx
+        └── Chat.jsx
+```
 
-### `npm run eject`
+---
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Getting Started
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Prerequisites
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+- Python 3.10+
+- Node.js 18+
+- AWS account with Bedrock access enabled for:
+  - `amazon.titan-embed-text-v2:0`
+  - `us.anthropic.claude-sonnet-4-5-20250929-v1:0`
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Backend Setup
 
-## Learn More
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Create a `.env` file in the `backend/` folder:
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_DEFAULT_REGION=us-east-1
+```
 
-### Code Splitting
+Start the server:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+```bash
+uvicorn main:app --reload --port 8000
+```
 
-### Analyzing the Bundle Size
+API will be live at `http://localhost:8000`
+Interactive docs at `http://localhost:8000/docs`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### Frontend Setup
 
-### Making a Progressive Web App
+```bash
+cd frontend
+npm install
+npm start
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Frontend will be live at `http://localhost:3000`
 
-### Advanced Configuration
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+## API Endpoints
 
-### Deployment
+### `POST /upload`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+Upload a PDF to index.
 
-### `npm run build` fails to minify
+**Request:** `multipart/form-data` with a `file` field
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+**Response:**
+
+```json
+{
+  "doc_id": "uuid",
+  "filename": "document.pdf",
+  "chunks": 42,
+  "message": "Successfully indexed 42 chunks from 'document.pdf'."
+}
+```
+
+### `POST /chat`
+
+Ask a question about an indexed document.
+
+**Request:**
+
+```json
+{
+  "doc_id": "uuid-from-upload",
+  "question": "What are the key findings?",
+  "history": []
+}
+```
+
+**Response:**
+
+```json
+{
+  "answer": "The key findings include... (p.3) ... (p.7)",
+  "source_pages": [3, 7]
+}
+```
+
+### `GET /health`
+
+Returns `{"status": "ok"}` — used for deployment health checks.
+
+---
+
+## Key Features
+
+- **Semantic search** — finds relevant content by meaning, not just keywords
+- **Page citations** — every answer references the exact pages it drew from
+- **Multi-turn memory** — follow-up questions maintain conversation context
+- **Chunking strategy** — 512-token chunks with 50-token overlap preserves context across boundaries
+- **Cosine similarity** — ChromaDB collection configured with HNSW cosine distance for accurate retrieval
+
+---
+
+## Environment Variables
+
+| Variable                | Description                     |
+| ----------------------- | ------------------------------- |
+| `AWS_ACCESS_KEY_ID`     | AWS IAM access key              |
+| `AWS_SECRET_ACCESS_KEY` | AWS IAM secret key              |
+| `AWS_DEFAULT_REGION`    | AWS region (default: us-east-1) |
+
+---
+
+## Author
+
+**Mohammad Zaid**
+
+- GitHub: [@m-zaid-mac](https://github.com/m-zaid-mac)
+- LinkedIn: [mohammad-zaid](https://www.linkedin.com/in/mohammad-zaid-6a360b276/)
+- Email: zaid.m@northeastern.edu
